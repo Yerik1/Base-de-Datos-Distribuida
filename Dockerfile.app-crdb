@@ -1,0 +1,16 @@
+# Imagen "cliente" (app-crdb): python3 + psycopg + psql, para correr los
+# scripts de p1-banca/scripts/ y abrir psql contra el cluster CockroachDB.
+FROM python:3.12-slim
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends postgresql-client ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir "psycopg[binary]"
+
+WORKDIR /workspace
+
+# Si el contenedor se corre sin comando (p. ej. "docker compose run app-crdb"
+# sin nada más), abrir una shell en vez del REPL de Python por defecto de la
+# imagen base — evita el error de pegar un comando de shell dentro de ">>>".
+CMD ["bash"]
