@@ -1,0 +1,81 @@
+ database |  region  | primary | secondary | zones 
+----------+----------+---------+-----------+-------
+ ti4601   | cr-sj    | t       | f         | {}
+ ti4601   | cr-limon | f       | f         | {}
+ ti4601   | us-east  | f       | f         | {}
+(3 rows)
+
+   table_name    |                            create_statement                             
+-----------------+-------------------------------------------------------------------------
+ catalogo_region | CREATE TABLE public.catalogo_region (                                  +
+                 |         codigo_region ti4601.public.crdb_internal_region NOT NULL,     +
+                 |         nombre STRING NOT NULL,                                        +
+                 |         pais STRING NOT NULL,                                          +
+                 |         CONSTRAINT catalogo_region_pkey PRIMARY KEY (codigo_region ASC)+
+                 | ) LOCALITY GLOBAL
+(1 row)
+
+ table_name |                                                   create_statement                                                   
+------------+----------------------------------------------------------------------------------------------------------------------
+ cliente    | CREATE TABLE public.cliente (                                                                                       +
+            |         region_apertura ti4601.public.crdb_internal_region NOT NULL,                                                +
+            |         id_cliente UUID NOT NULL DEFAULT gen_random_uuid(),                                                         +
+            |         nombre STRING NOT NULL,                                                                                     +
+            |         documento STRING NOT NULL,                                                                                  +
+            |         correo STRING NULL,                                                                                         +
+            |         telefono STRING NULL,                                                                                       +
+            |         CONSTRAINT cliente_pkey PRIMARY KEY (region_apertura ASC, id_cliente ASC),                                  +
+            |         CONSTRAINT fk_cliente_region FOREIGN KEY (region_apertura) REFERENCES public.catalogo_region(codigo_region),+
+            |         UNIQUE INDEX cliente_id_cliente_key (id_cliente ASC)                                                        +
+            | ) LOCALITY REGIONAL BY ROW AS region_apertura
+(1 row)
+
+ table_name |                                              create_statement                                              
+------------+------------------------------------------------------------------------------------------------------------
+ cuenta     | CREATE TABLE public.cuenta (                                                                              +
+            |         region ti4601.public.crdb_internal_region NOT NULL,                                               +
+            |         num_cuenta UUID NOT NULL DEFAULT gen_random_uuid(),                                               +
+            |         tipo_cuenta STRING NOT NULL,                                                                      +
+            |         saldo DECIMAL(14,2) NOT NULL DEFAULT 0:::DECIMAL,                                                 +
+            |         fecha_apertura TIMESTAMPTZ NOT NULL DEFAULT now():::TIMESTAMPTZ,                                  +
+            |         id_cliente UUID NOT NULL,                                                                         +
+            |         CONSTRAINT cuenta_pkey PRIMARY KEY (region ASC, num_cuenta ASC),                                  +
+            |         CONSTRAINT fk_cuenta_region FOREIGN KEY (region) REFERENCES public.catalogo_region(codigo_region),+
+            |         CONSTRAINT fk_cuenta_cliente FOREIGN KEY (id_cliente) REFERENCES public.cliente(id_cliente),      +
+            |         CONSTRAINT check_saldo CHECK (saldo >= 0:::DECIMAL)                                               +
+            | ) LOCALITY REGIONAL BY ROW AS region
+(1 row)
+
+ table_name |                                                    create_statement                                                    
+------------+------------------------------------------------------------------------------------------------------------------------
+ movimiento | CREATE TABLE public.movimiento (                                                                                      +
+            |         region ti4601.public.crdb_internal_region NOT NULL,                                                           +
+            |         id_movimiento UUID NOT NULL DEFAULT gen_random_uuid(),                                                        +
+            |         tipo_movimiento STRING NOT NULL,                                                                              +
+            |         monto DECIMAL(14,2) NOT NULL,                                                                                 +
+            |         fecha TIMESTAMPTZ NOT NULL DEFAULT now():::TIMESTAMPTZ,                                                       +
+            |         num_cuenta UUID NOT NULL,                                                                                     +
+            |         CONSTRAINT movimiento_pkey PRIMARY KEY (region ASC, id_movimiento ASC),                                       +
+            |         CONSTRAINT fk_movimiento_cuenta FOREIGN KEY (region, num_cuenta) REFERENCES public.cuenta(region, num_cuenta),+
+            |         CONSTRAINT check_monto CHECK (monto > 0:::DECIMAL)                                                            +
+            | ) LOCALITY REGIONAL BY ROW AS region
+(1 row)
+
+               start_key                |         end_key          | range_id |      range_size_mb      | lease_holder | lease_holder_locality | replicas |              replica_localities               | voting_replicas | non_voting_replicas | learner_replicas | split_enforced_until | range_size |                                                                                                          span_stats                                                                                                          
+----------------------------------------+--------------------------+----------+-------------------------+--------------+-----------------------+----------+-----------------------------------------------+-----------------+---------------------+------------------+----------------------+------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ <before:/Table/109/2/"\xc0"/PrefixEnd> | …/1/"@"                  |       77 |                       0 |            1 | region=cr-sj          | {1,2,3}  | {region=cr-sj,region=cr-limon,region=us-east} | {1,2,3}         | {}                  | {}               |                      |          0 | {"approximate_disk_bytes": 92289, "intent_bytes": 0, "intent_count": 0, "key_bytes": 0, "key_count": 0, "live_bytes": 0, "live_count": 0, "sys_bytes": 376, "sys_count": 6, "val_bytes": 0, "val_count": 0}
+ …/1/"@"                                | …/1/"@"/PrefixEnd        |       78 | 0.026200000000000000000 |            2 | region=cr-limon       | {1,2,3}  | {region=cr-sj,region=cr-limon,region=us-east} | {1,2,3}         | {}                  | {}               |                      |      26200 | {"approximate_disk_bytes": 92289, "intent_bytes": 0, "intent_count": 0, "key_bytes": 12322, "key_count": 247, "live_bytes": 7439, "live_count": 83, "sys_bytes": 446, "sys_count": 7, "val_bytes": 13878, "val_count": 448}
+ …/1/"@"/PrefixEnd                      | …/1/"\xc0"               |       79 | 0.023858000000000000000 |            1 | region=cr-sj          | {1,2,3}  | {region=cr-sj,region=cr-limon,region=us-east} | {1,2,3}         | {}                  | {}               |                      |      23858 | {"approximate_disk_bytes": 186877, "intent_bytes": 0, "intent_count": 0, "key_bytes": 11166, "key_count": 223, "live_bytes": 6720, "live_count": 75, "sys_bytes": 380, "sys_count": 6, "val_bytes": 12692, "val_count": 408}
+ …/1/"\xc0"                             | …/1/"\xc0"/PrefixEnd     |       80 | 0.021304000000000000000 |            3 | region=us-east        | {1,2,3}  | {region=cr-sj,region=cr-limon,region=us-east} | {1,2,3}         | {}                  | {}               |                      |      21304 | {"approximate_disk_bytes": 124724, "intent_bytes": 0, "intent_count": 0, "key_bytes": 10480, "key_count": 217, "live_bytes": 6547, "live_count": 73, "sys_bytes": 446, "sys_count": 7, "val_bytes": 10824, "val_count": 365}
+ …/1/"\xc0"/PrefixEnd                   | <after:/Table/111/1/"@"> |       81 |                       0 |            1 | region=cr-sj          | {1,2,3}  | {region=cr-sj,region=cr-limon,region=us-east} | {1,2,3}         | {}                  | {}               |                      |          0 | {"approximate_disk_bytes": 94207, "intent_bytes": 0, "intent_count": 0, "key_bytes": 0, "key_count": 0, "live_bytes": 0, "live_count": 0, "sys_bytes": 380, "sys_count": 6, "val_bytes": 0, "val_count": 0}
+(5 rows)
+
+               start_key                |       end_key        | range_id |      range_size_mb      | lease_holder | lease_holder_locality | replicas |              replica_localities               | voting_replicas | non_voting_replicas | learner_replicas | split_enforced_until | range_size |                                                                                                           span_stats                                                                                                            
+----------------------------------------+----------------------+----------+-------------------------+--------------+-----------------------+----------+-----------------------------------------------+-----------------+---------------------+------------------+----------------------+------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ <before:/Table/110/1/"\xc0"/PrefixEnd> | …/1/"@"              |       81 |                       0 |            1 | region=cr-sj          | {1,2,3}  | {region=cr-sj,region=cr-limon,region=us-east} | {1,2,3}         | {}                  | {}               |                      |          0 | {"approximate_disk_bytes": 94207, "intent_bytes": 0, "intent_count": 0, "key_bytes": 0, "key_count": 0, "live_bytes": 0, "live_count": 0, "sys_bytes": 380, "sys_count": 6, "val_bytes": 0, "val_count": 0}
+ …/1/"@"                                | …/1/"@"/PrefixEnd    |       82 | 0.094544000000000000000 |            2 | region=cr-limon       | {1,2,3}  | {region=cr-sj,region=cr-limon,region=us-east} | {1,2,3}         | {}                  | {}               |                      |      94544 | {"approximate_disk_bytes": 341049, "intent_bytes": 0, "intent_count": 0, "key_bytes": 46997, "key_count": 978, "live_bytes": 28909, "live_count": 326, "sys_bytes": 446, "sys_count": 7, "val_bytes": 47547, "val_count": 1630}
+ …/1/"@"/PrefixEnd                      | …/1/"\xc0"           |       83 | 0.092199000000000000000 |            1 | region=cr-sj          | {1,2,3}  | {region=cr-sj,region=cr-limon,region=us-east} | {1,2,3}         | {}                  | {}               |                      |      92199 | {"approximate_disk_bytes": 279083, "intent_bytes": 0, "intent_count": 0, "key_bytes": 45565, "key_count": 948, "live_bytes": 28192, "live_count": 316, "sys_bytes": 380, "sys_count": 6, "val_bytes": 46634, "val_count": 1580}
+ …/1/"\xc0"                             | …/1/"\xc0"/PrefixEnd |       84 | 0.085765000000000000000 |            3 | region=us-east        | {1,2,3}  | {region=cr-sj,region=cr-limon,region=us-east} | {1,2,3}         | {}                  | {}               |                      |      85765 | {"approximate_disk_bytes": 228777, "intent_bytes": 0, "intent_count": 0, "key_bytes": 42518, "key_count": 885, "live_bytes": 26232, "live_count": 295, "sys_bytes": 446, "sys_count": 7, "val_bytes": 43247, "val_count": 1475}
+ …/1/"\xc0"/PrefixEnd                   | <after:/Max>         |       85 |                       0 |            1 | region=cr-sj          | {1,2,3}  | {region=cr-sj,region=cr-limon,region=us-east} | {1,2,3}         | {}                  | {}               |                      |          0 | {"approximate_disk_bytes": 0, "intent_bytes": 0, "intent_count": 0, "key_bytes": 0, "key_count": 0, "live_bytes": 0, "live_count": 0, "sys_bytes": 307, "sys_count": 6, "val_bytes": 0, "val_count": 0}
+(5 rows)
+
