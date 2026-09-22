@@ -1,3 +1,4 @@
+name: ti4601
 services:
   crdb-1:
     image: cockroachdb/cockroach:latest-v23.2
