@@ -1,0 +1,48 @@
+﻿CockroachDB node starting at 2026-09-14 22:07:30.158297452 +0000 UTC m=+2.650597145 (took 2.4s)
+build:               CCL v23.2.31 @ 2026/06/24 13:36:46 (go1.21.12 X:nocoverageredesign)
+malloc_conf:         prof:false,prof_active:true,background_thread:true,thp:never,metadata_thp:disabled,narenas:32,dirty_decay_ms:2000,muzzy_decay_ms:0
+webui:               http://crdb-2:8080
+sql:                 postgresql://root@crdb-2:26257/defaultdb?sslmode=disable
+sql (JDBC):          jdbc:postgresql://crdb-2:26257/defaultdb?sslmode=disable&user=root
+RPC client flags:    /cockroach/cockroach <client cmd> --host=crdb-2:26257 --insecure
+logs:                /cockroach/cockroach-data/logs
+locality:            region=cr-limon
+temp dir:            /cockroach/cockroach-data/cockroach-temp4099487321
+external I/O path:   /cockroach/cockroach-data/extern
+store[0]:            path=/cockroach/cockroach-data
+storage engine:      pebble
+clusterID:           edb8b0fc-3e47-4200-bc41-2c53721f8278
+status:              restarted pre-existing node
+nodeID:              2
+CockroachDB node starting at 2026-09-14 22:13:33.929290427 +0000 UTC m=+3.848270468 (took 3.6s)
+build:               CCL v23.2.31 @ 2026/06/24 13:36:46 (go1.21.12 X:nocoverageredesign)
+malloc_conf:         prof:false,prof_active:true,background_thread:true,thp:never,metadata_thp:disabled,narenas:32,dirty_decay_ms:2000,muzzy_decay_ms:0
+webui:               http://crdb-2:8080
+sql:                 postgresql://root@crdb-2:26257/defaultdb?sslmode=disable
+sql (JDBC):          jdbc:postgresql://crdb-2:26257/defaultdb?sslmode=disable&user=root
+RPC client flags:    /cockroach/cockroach <client cmd> --host=crdb-2:26257 --insecure
+logs:                /cockroach/cockroach-data/logs
+locality:            region=cr-limon
+temp dir:            /cockroach/cockroach-data/cockroach-temp1865099416
+external I/O path:   /cockroach/cockroach-data/extern
+store[0]:            path=/cockroach/cockroach-data
+storage engine:      pebble
+clusterID:           edb8b0fc-3e47-4200-bc41-2c53721f8278
+status:              restarted pre-existing node
+nodeID:              2
+CockroachDB node starting at 2026-09-14 22:24:28.143265309 +0000 UTC m=+6.402947741 (took 6.1s)
+build:               CCL v23.2.31 @ 2026/06/24 13:36:46 (go1.21.12 X:nocoverageredesign)
+malloc_conf:         prof:false,prof_active:true,background_thread:true,thp:never,metadata_thp:disabled,narenas:32,dirty_decay_ms:2000,muzzy_decay_ms:0
+webui:               http://crdb-2:8080
+sql:                 postgresql://root@crdb-2:26257/defaultdb?sslmode=disable
+sql (JDBC):          jdbc:postgresql://crdb-2:26257/defaultdb?sslmode=disable&user=root
+RPC client flags:    /cockroach/cockroach <client cmd> --host=crdb-2:26257 --insecure
+logs:                /cockroach/cockroach-data/logs
+locality:            region=cr-limon
+temp dir:            /cockroach/cockroach-data/cockroach-temp1327648777
+external I/O path:   /cockroach/cockroach-data/extern
+store[0]:            path=/cockroach/cockroach-data
+storage engine:      pebble
+clusterID:           edb8b0fc-3e47-4200-bc41-2c53721f8278
+status:              restarted pre-existing node
+nodeID:              2
