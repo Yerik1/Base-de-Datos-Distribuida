@@ -1,0 +1,90 @@
+name: ti4601
+services:
+  crdb-1:
+    image: cockroachdb/cockroach:latest-v23.2
+    container_name: ti4601-crdb-1
+    command: start --insecure --join=crdb-1:26257,crdb-2:26257,crdb-3:26257 --locality=region=cr-sj --advertise-addr=crdb-1 --http-addr=0.0.0.0:8080
+    ports:
+      - "26257:26257"
+      - "8080:8080"
+    volumes:
+      - crdb1-data:/cockroach/cockroach-data
+    profiles: ["lab1"]
+
+  crdb-2:
+    image: cockroachdb/cockroach:latest-v23.2
+    container_name: ti4601-crdb-2
+    command: start --insecure --join=crdb-1:26257,crdb-2:26257,crdb-3:26257 --locality=region=cr-limon --advertise-addr=crdb-2 --http-addr=0.0.0.0:8080
+    volumes:
+      - crdb2-data:/cockroach/cockroach-data
+    profiles: ["lab1"]
+
+  crdb-3:
+    image: cockroachdb/cockroach:latest-v23.2
+    container_name: ti4601-crdb-3
+    command: start --insecure --join=crdb-1:26257,crdb-2:26257,crdb-3:26257 --locality=region=us-east --advertise-addr=crdb-3 --http-addr=0.0.0.0:8080
+    volumes:
+      - crdb3-data:/cockroach/cockroach-data
+    profiles: ["lab1"]
+
+  # Servicio de un solo uso: inicializa el cluster (cockroach init) y crea
+  # la base "ti4601" apenas los 3 nodos aceptan conexiones. Lo dispara
+  # "make lab1-up"; también se puede correr suelto con
+  # "docker compose --profile lab1 run --rm --no-deps crdb-init".
+  crdb-init:
+    image: cockroachdb/cockroach:latest-v23.2
+    depends_on:
+      - crdb-1
+      - crdb-2
+      - crdb-3
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo 'Esperando e inicializando el cluster ti4601...'
+        i=0
+        until cockroach init --insecure --host=crdb-1:26257 2>/tmp/init.log || grep -qi 'already been initialized' /tmp/init.log; do
+          i=$$((i+1))
+          if [ "$$i" -ge 30 ]; then
+            echo 'Timeout esperando a que los nodos esten listos:'
+            cat /tmp/init.log
+            exit 1
+          fi
+          echo 'Nodos aun no listos, reintentando en 2s...'
+          sleep 2
+        done
+        echo 'Cluster inicializado (o ya lo estaba).'
+        cockroach sql --insecure --host=crdb-1:26257 -e "CREATE DATABASE IF NOT EXISTS ti4601;"
+        echo 'Base ti4601 lista.'
+    profiles: ["lab1"]
+
+  # Contenedor "cliente": trae python3 + psycopg + psql. Es donde corren
+  # seed.py / measure_latency.py / verify_p1.py y donde se abre psql para
+  # aplicar el esquema (ver p1-banca/README.md).
+  app-crdb:
+    build:
+      context: .
+      dockerfile: Dockerfile.app-crdb
+    image: app-crdb
+    depends_on:
+      - crdb-1
+      - crdb-2
+      - crdb-3
+    environment:
+      PGHOST: crdb-1
+      PGPORT: "26257"
+      PGUSER: root
+      PGDATABASE: ti4601
+      PGSSLMODE: disable
+      COCKROACH_LICENSE: ${COCKROACH_LICENSE:-}
+      COCKROACH_ORGANIZATION: ${COCKROACH_ORGANIZATION:-}
+    volumes:
+      - ./:/workspace
+    working_dir: /workspace
+    tty: true
+    stdin_open: true
+    profiles: ["lab1"]
+
+volumes:
+  crdb1-data:
+  crdb2-data:
+  crdb3-data:
