@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Verifica, de solo lectura, que el esquema propio del Proyecto 1 (Opción A)
-está configurado según el Entregable 1: 3 regiones, catalogo_region GLOBAL,
-cliente/cuenta/movimiento REGIONAL BY ROW, y una fila por región en cada
-tabla fragmentada. Inspirado en labs/lab1-cluster/verify_cluster.py, pero
-sobre el esquema propio (no crea ni corrige nada).
+"""Verifica, de solo lectura, que el esquema de banca regional cumple lo
+definido en el Entregable 1: regiones configuradas, localidades correctas
+(GLOBAL / REGIONAL BY ROW) y datos sembrados en las 3 regiones.
+No crea ni corrige nada; solo reporta [OK]/[FAIL] por verificación.
 """
 
 from __future__ import annotations
@@ -17,6 +16,7 @@ EXPECTED_REGIONS = {"cr-sj", "cr-limon", "us-east"}
 
 
 def live_regions(conn: psycopg.Connection) -> set[str]:
+    # Extrae el código de región de la locality de cada nodo vivo del clúster.
     rows = conn.execute(
         "SELECT locality FROM crdb_internal.gossip_nodes WHERE is_live"
     ).fetchall()
@@ -29,6 +29,7 @@ def live_regions(conn: psycopg.Connection) -> set[str]:
 
 
 def check(label: str, assertion: Callable[[], bool], hint: str) -> bool:
+    # Evalúa una condición puntual e imprime [OK]/[FAIL] con una pista de corrección.
     try:
         passed = assertion()
     except (psycopg.Error, IndexError, TypeError) as exc:
@@ -44,6 +45,7 @@ def check(label: str, assertion: Callable[[], bool], hint: str) -> bool:
 
 
 def main() -> int:
+    # Punto de entrada: conecta al clúster y corre la batería de verificaciones.
     try:
         conn = psycopg.connect(autocommit=True)
     except psycopg.Error as exc:
@@ -52,6 +54,8 @@ def main() -> int:
         return 1
 
     with conn:
+        # Verificaciones en orden: clúster, configuración de regiones, localidades
+        # de las tablas y presencia de datos consistentes en las 3 regiones.
         results = [
             check(
                 "tres nodos/localities vivos",
@@ -125,7 +129,7 @@ def main() -> int:
             ),
         ]
 
-    passed = sum(results)
+    passed = sum(results)  # True/False de check() se suman como 1/0
     print(f"\nResultado: {passed}/{len(results)} verificaciones.")
     if passed != len(results):
         print("El verificador no modificó nada. Corrija el primer FAIL y repita.")

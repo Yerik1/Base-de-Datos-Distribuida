@@ -1,24 +1,10 @@
 #!/usr/bin/env python3
-"""Mide p50/p99 de lecturas y escrituras locales y remotas sobre "cuenta".
+"""Mide p50/p99 de lecturas y escrituras, locales y remotas, sobre "cuenta".
 
-Adaptación, para el dominio propio del equipo (Opción A: Banca), del método
-de labs/lab1-cluster/measure_latency.py: gateway fijo (crdb-1, región
-cr-sj), 4 casos, descarte de warm-up, percentil por "nearest rank", salida
-en consola + CSV. La tabla objetivo, las columnas y las filas de prueba son
-las del Entregable 1 (no las del Lab 1).
-
-Los 4 casos exigidos por el enunciado del Proyecto 1 (E2/E3):
-
-    Desde región      Operación              Fila hogar
-    R1 = cr-sj         lectura local          cr-sj   (mismo nodo/región)
-    R1 -> R2 = cr-limon lectura remota        cr-limon
-    R1 = cr-sj         escritura local        cr-sj
-    R1 -> R2 = cr-limon escritura que cruza   cr-limon
-
-"Local" = el gateway que recibe la conexión (crdb-1, región cr-sj) y la fila
-leída/escrita tienen la misma región hogar. "Cruza región" = el gateway es
-cr-sj pero la fila hogar está en cr-limon, por lo que Cockroach debe resolver
-el leaseholder de esa partición en el nodo de cr-limon.
+El gateway queda fijo en crdb-1 (región cr-sj); se comparan 4 casos (lectura
+y escritura, cada una local a cr-sj o remota hacia cr-limon), descartando un
+warm-up inicial y calculando el percentil por "nearest rank". "Remota"
+implica que CockroachDB debe resolver el leaseholder en el nodo de cr-limon.
 
 Uso (dentro de app-crdb, después de correr seed.py):
 
@@ -62,6 +48,7 @@ CASES = (
 
 
 def connect(host: str) -> psycopg.Connection:
+    # Abre la conexión al nodo gateway indicado (por defecto crdb-1, región cr-sj).
     return psycopg.connect(
         host=host,
         port=26257,
@@ -74,12 +61,14 @@ def connect(host: str) -> psycopg.Connection:
 
 
 def percentile_nearest_rank(values: list[float], percentile: float) -> float:
+    # Percentil por "nearest rank": redondea hacia arriba la posición en la muestra ordenada.
     ordered = sorted(values)
     rank = max(1, math.ceil(percentile * len(ordered)))
     return ordered[rank - 1]
 
 
 def execute_case(conn: psycopg.Connection, case: Case) -> None:
+    # Ejecuta, sobre la cuenta de prueba del caso, la lectura o escritura correspondiente.
     num_cuenta = CUENTAS_PRUEBA[case.region]
     if case.operation == "read":
         row = conn.execute(
@@ -106,7 +95,7 @@ def execute_case(conn: psycopg.Connection, case: Case) -> None:
 
 
 def measure(conn: psycopg.Connection, case: Case, warmup: int, runs: int) -> list[float]:
-    for _ in range(warmup):
+    for _ in range(warmup):  # descarta el efecto de cold start / caché
         execute_case(conn, case)
 
     samples: list[float] = []
@@ -140,7 +129,7 @@ def main() -> int:
     with connect(args.gateway) as conn:
         gateway_region = conn.execute("SELECT gateway_region()").fetchone()[0]
         print(f"Región del gateway: {gateway_region}")
-        for case in CASES:
+        for case in CASES:  # corre los 4 casos y guarda muestras crudas + resumen
             samples = measure(conn, case, args.warmup, args.runs)
             for run, elapsed_ms in enumerate(samples, start=1):
                 raw.append(
@@ -171,7 +160,7 @@ def main() -> int:
             f"{row['p50_ms']:>7.3f} {row['p99_ms']:>7.3f}"
         )
 
-    if args.csv:
+    if args.csv:  # exporta cada muestra individual, no solo el resumen
         os.makedirs(os.path.dirname(args.csv) or ".", exist_ok=True)
         with open(args.csv, "w", newline="", encoding="utf-8") as handle:
             writer = csv.DictWriter(handle, fieldnames=raw[0].keys())
@@ -180,7 +169,7 @@ def main() -> int:
         print(f"\nMuestras crudas: {args.csv}")
 
     print(
-        "\nNota metodológica (obligatoria citarla en el PDF): las 3 regiones corren "
+        "\n Las 3 regiones corren "
         "como localidades lógicas en una sola máquina (Docker); no se inyectó "
         "latencia de red adicional. Un cociente remoto/local cercano a 1 es un "
         "resultado válido en este entorno y debe documentarse como límite, no "
