@@ -1,5 +1,4 @@
 .env
-p1-banca/evidence/*
 !p1-banca/evidence/.gitkeep
 __pycache__/
 *.pyc

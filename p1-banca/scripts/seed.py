@@ -1,25 +1,15 @@
 #!/usr/bin/env python3
-"""Genera y carga un dataset SINTÉTICO razonable para la Opción A (Banca).
+"""Genera y carga un dataset sintético para el esquema de banca regional
+(Entregable 1), reutilizando el patrón de conexión del Laboratorio 1.
 
-Reutiliza el patrón de conexión del Lab 1 (variables PG* inyectadas por
-Compose; ver labs/lab1-cluster/measure_latency.py) pero define su propio
-dominio, tal como exige el Proyecto 1 (README raíz del repo del curso,
-sección "Frontera con el Proyecto 1": el equipo debe crear su propio
-esquema y seed, no reusar los del Lab 1).
+Por cada una de las 3 regiones siembra ~50 clientes, 1-2 cuentas por cliente
+y 2-6 movimientos por cuenta, además de una fila de prueba con UUID fijo
+que measure_latency.py usa como objetivo estable de medición.
 
-Volumen por región (3 regiones = cr-sj, cr-limon, us-east):
-  - 50 clientes
-  - ~1-2 cuentas por cliente (≈ 80 cuentas)
-  - ~2-6 movimientos por cuenta (≈ 300-350 movimientos)
-
-Además siembra UNA "cuenta de prueba" fija por región (UUID conocido) que
-usa scripts/measure_latency.py como fila objetivo estable para medir p50/p99,
-igual que labs/lab1-cluster/measure_latency.py usa filas fijas de "pedido".
-
-Uso (dentro del contenedor app-crdb, ver README.md de esta carpeta):
+Uso (dentro del contenedor app-crdb):
 
     python3 p1-banca/scripts/seed.py
-    python3 p1-banca/scripts/seed.py --reset   # vacía las 4 tablas antes de sembrar
+    python3 p1-banca/scripts/seed.py --reset   # vacía las tablas antes de sembrar
 """
 
 from __future__ import annotations
@@ -37,9 +27,8 @@ REGIONES = {
     "us-east": ("Este de EE. UU.", "Estados Unidos"),
 }
 
-# Cuentas/clientes "de prueba" con UUID fijo: no son parte de la muestra
-# aleatoria; existen para que measure_latency.py siempre lea/escriba la
-# MISMA fila conocida en cada región (igual que ROWS en el Lab 1).
+# Cliente/cuenta "de prueba" con UUID fijo por región: fila estable que
+# measure_latency.py reutiliza en cada corrida, aparte de la muestra aleatoria.
 CLIENTE_PRUEBA = {
     "cr-sj": "1e000000-0000-0000-0000-000000000001",
     "cr-limon": "1e000000-0000-0000-0000-000000000002",
@@ -68,28 +57,34 @@ N_CLIENTES_POR_REGION = 50
 
 
 def nombre_falso(rng: random.Random) -> str:
+    # Combina un nombre y un apellido tomados al azar de las listas fijas.
     return f"{rng.choice(NOMBRES)} {rng.choice(APELLIDOS)}"
 
 
 def documento_falso(rng: random.Random) -> str:
+    # Genera un número de cédula ficticio con el formato típico costarricense.
     return f"{rng.randint(1, 9)}-{rng.randint(1000, 9999)}-{rng.randint(1000, 9999)}"
 
 
 def correo_falso(nombre: str, rng: random.Random) -> str:
+    # Deriva un correo ficticio a partir del nombre, agregando un sufijo numérico.
     slug = nombre.lower().replace(" ", ".")
     return f"{slug}{rng.randint(1, 999)}@correo-ficticio.test"
 
 
 def telefono_falso(rng: random.Random) -> str:
+    # Genera un número telefónico ficticio de 8 dígitos.
     return f"{rng.randint(6000, 8999)}-{rng.randint(1000, 9999)}"
 
 
 def fecha_pasada(rng: random.Random, dias_max: int = 900) -> datetime:
+    # Devuelve una fecha/hora en el pasado, hasta dias_max días antes de ahora.
     delta = timedelta(days=rng.randint(0, dias_max), hours=rng.randint(0, 23))
     return datetime.now(timezone.utc) - delta
 
 
 def reset(conn: psycopg.Connection) -> None:
+    # Orden inverso a las FK (movimiento -> cuenta -> cliente -> catalogo_region).
     print("--reset: vaciando movimiento, cuenta, cliente, catalogo_region ...")
     conn.execute("DELETE FROM movimiento")
     conn.execute("DELETE FROM cuenta")
@@ -98,6 +93,7 @@ def reset(conn: psycopg.Connection) -> None:
 
 
 def sembrar_catalogo(conn: psycopg.Connection) -> None:
+    # Carga (o actualiza) la fila de catalogo_region correspondiente a cada región.
     for codigo, (nombre, pais) in REGIONES.items():
         conn.execute(
             """
@@ -109,6 +105,7 @@ def sembrar_catalogo(conn: psycopg.Connection) -> None:
 
 
 def sembrar_fila_de_prueba(conn: psycopg.Connection, region: str, rng: random.Random) -> None:
+    # Inserta el cliente y la cuenta con UUID fijo de la región (idempotente).
     nombre = f"Cliente prueba {region}"
     conn.execute(
         """
@@ -143,6 +140,7 @@ def sembrar_fila_de_prueba(conn: psycopg.Connection, region: str, rng: random.Ra
 
 
 def sembrar_region(conn: psycopg.Connection, region: str, rng: random.Random) -> tuple[int, int, int]:
+    # Puebla una región con clientes, cuentas y movimientos aleatorios.
     n_clientes = n_cuentas = n_movimientos = 0
 
     sembrar_fila_de_prueba(conn, region, rng)
@@ -166,7 +164,7 @@ def sembrar_region(conn: psycopg.Connection, region: str, rng: random.Random) ->
         )
         n_clientes += 1
 
-        for _ in range(rng.randint(1, 2)):
+        for _ in range(rng.randint(1, 2)):  # 1-2 cuentas por cliente
             num_cuenta = str(uuid.uuid4())
             saldo_inicial = round(rng.uniform(0, 5000), 2)
             conn.execute(
@@ -185,14 +183,14 @@ def sembrar_region(conn: psycopg.Connection, region: str, rng: random.Random) ->
             )
             n_cuentas += 1
 
-            for _ in range(rng.randint(2, 6)):
+            for _ in range(rng.randint(2, 6)):  # 2-6 movimientos por cuenta
                 conn.execute(
                     """
                     INSERT INTO movimiento (region, id_movimiento, tipo_movimiento, monto, fecha, num_cuenta)
                     VALUES (%s, %s, %s, %s, %s, %s)
                     """,
                     (
-                        region,  # copia denormalizada; forzada además por la FK compuesta
+                        region,  # copia denormalizada de cuenta.region
                         str(uuid.uuid4()),
                         rng.choice(TIPOS_MOVIMIENTO),
                         round(rng.uniform(5, 800), 2),
@@ -206,12 +204,13 @@ def sembrar_region(conn: psycopg.Connection, region: str, rng: random.Random) ->
 
 
 def main() -> int:
+    # Punto de entrada: parsea argumentos y orquesta el sembrado de las 3 regiones.
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--reset", action="store_true", help="vaciar las tablas antes de sembrar")
     parser.add_argument("--seed", type=int, default=42, help="semilla del generador (reproducibilidad)")
     args = parser.parse_args()
 
-    rng = random.Random(args.seed)
+    rng = random.Random(args.seed)  # semilla fija: corridas reproducibles
 
     with psycopg.connect(autocommit=True) as conn:
         if args.reset:
@@ -221,7 +220,7 @@ def main() -> int:
         print("catalogo_region: 3 filas (cr-sj, cr-limon, us-east)")
 
         total = (0, 0, 0)
-        for region in REGIONES:
+        for region in REGIONES:  # siembra cada región y acumula los totales
             counts = sembrar_region(conn, region, rng)
             total = tuple(a + b for a, b in zip(total, counts))
             print(f"{region}: {counts[0]} clientes, {counts[1]} cuentas, {counts[2]} movimientos"
